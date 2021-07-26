@@ -72,4 +72,7 @@ class ratingallocate_allocations {
     const USERID = 'userid';
     const RATINGALLOCATEID = 'ratingallocateid';
     const CHOICEID = 'choiceid';
+    const MANUAL = 'manual';
+    const REASON = 'reason';
+    const ALLOCATORID = 'allocatorid';
 }
