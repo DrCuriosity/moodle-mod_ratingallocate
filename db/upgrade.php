@@ -178,5 +178,36 @@ function xmldb_ratingallocate_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2021062901, 'ratingallocate');
     }
 
+    if ($oldversion < 2021072700) {
+
+        // Fields to be added to ratingallocate_allocations.
+        $table = new xmldb_table('ratingallocate_allocations');
+
+        // Conditionally launch add field manual.
+        $field = new xmldb_field('manual', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'choiceid');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // Conditionally launch add field reason.
+        $field = new xmldb_field('reason', XMLDB_TYPE_TEXT, null, null, null, null, null, 'manual');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // Conditionally launch add field allocatorid.
+        $field = new xmldb_field('allocatorid', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'reason');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // Launch add key allocatorid.
+        $key = new xmldb_key('allocatorid', XMLDB_KEY_FOREIGN, ['allocatorid'], 'user', ['id']);
+        $dbman->add_key($table, $key);
+
+        // Ratingallocate savepoint reached.
+        upgrade_mod_savepoint(true, 2021072700, 'ratingallocate');
+    }
+
     return true;
 }
