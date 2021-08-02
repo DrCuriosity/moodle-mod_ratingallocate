@@ -58,7 +58,7 @@ class distributor {
     protected $graph;
 
     /**
-     * Compute the 'satisfaction' functions that is to be maximized by adding the 
+     * Compute the 'satisfaction' functions that is to be maximized by adding the
      * ratings users gave to their allocated choices
      * @param array $ratings
      * @param array $distribution
@@ -106,7 +106,7 @@ class distributor {
 
         foreach ($distributions as $choiceid => $users) {
             foreach ($users as $userid) {
-                $ratingallocate->add_allocation($choiceid, $userid, $ratingallocate->ratingallocate->id);
+                $ratingallocate->add_allocation($choiceid, $userid);
             }
         }
         $transaction->allow_commit();
@@ -218,7 +218,7 @@ class distributor {
     }
 
     /**
-     * Augments the flow in the network, i.e. augments the overall 'satisfaction' 
+     * Augments the flow in the network, i.e. augments the overall 'satisfaction'
      * by distributing users to choices
      * Reverses all edges along $path in $graph
      * @param type $path path from t to s
@@ -251,7 +251,7 @@ class distributor {
                 array_splice($this->graph[$from], $foundedgeid, 1);
                 // Add a new edge in the opposite direction whose weight has an opposite sign
                 // array_push($this->graph[$to], new edge($to, $from, -1 * $edge->weight));
-                // according to php doc, this is faster 
+                // according to php doc, this is faster
                 $this->graph[$to][] =  new edge($to, $from, -1 * $edge->weight);
             }
         }
