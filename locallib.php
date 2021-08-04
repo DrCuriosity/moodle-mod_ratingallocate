@@ -1052,6 +1052,19 @@ class ratingallocate {
     }
 
     /**
+     * Return all manual pre-allocations for the activity.
+     *
+     * @return array of manual allocation records.
+     */
+    public function get_manual_preallocations() {
+        $records = $this->db->get_records('ratingallocate_allocations', array(
+            'ratingallocateid' => intval($this->ratingallocateid),
+            'manual' => 1
+        ));
+        return $records;
+    }
+
+    /**
      * Removes all allocations for choices in $ratingallocateid
      */
     public function clear_all_allocations() {
@@ -1445,15 +1458,21 @@ class ratingallocate {
      * add an allocation between choiceid and userid
      * @param int $choiceid
      * @param int $userid
+     * @param boolean $manual Is it a manual pre-allocation?
+     * @param string $reason Reason(s) for pre-allocation.
+     * @param int $allocatorid User responsible for pre-allocation.
      * @return boolean
      */
-    public function add_allocation($choiceid, $userid) {
-        $this->db->insert_record_raw('ratingallocate_allocations', array(
+    public function add_allocation($choiceid, $userid, $manual=false, $reason=null, $allocatorid=null) {
+        $result = $this->db->insert_record('ratingallocate_allocations', array(
             'choiceid' => $choiceid,
             'userid' => $userid,
-            'ratingallocateid' => $this->ratingallocateid
+            'ratingallocateid' => $this->ratingallocateid,
+            'manual' => (int) $manual,
+            'reason' => $reason,
+            'allocatorid' => $allocatorid,
         ));
-        return true;
+        return $result;
     }
 
     /**
