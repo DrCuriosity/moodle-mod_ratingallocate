@@ -113,6 +113,21 @@ class distributor {
     }
 
     /**
+     * Filter an array to remove items for any preallocated userids.
+     *
+     * @param array[object] $objects Array of objects with userids.
+     * @param string $keyname Key to match against
+     * @param array[string] $userids
+     *
+     * @return array[object] Array of filtered ratings.
+     */
+    public function filter_by_userids($objects, $keyname, $userids) {
+        return array_filter($objects, function ($obj) use ($keyname, $userids) {
+            return !in_array(get_object_vars($obj)[$keyname], $userids);
+        });
+    }
+
+    /**
      * Extracts a distribution/allocation from the graph.
      *
      * @param $touserid a map mapping from indexes in the graph to userids
