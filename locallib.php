@@ -1066,9 +1066,18 @@ class ratingallocate {
 
     /**
      * Removes all allocations for choices in $ratingallocateid
+     *
+     * @param boolean $keepmanuals Keep manual pre-allocations in place.
+     *
      */
-    public function clear_all_allocations() {
-        $this->db->delete_records('ratingallocate_allocations', array('ratingallocateid' => intval($this->ratingallocateid)));
+    public function clear_all_allocations($keepmanuals=false) {
+        $conditions = array(
+            'ratingallocateid' => intval($this->ratingallocateid)
+        );
+        if ($keepmanuals) {
+            $conditions['manual'] = 0;
+        }
+        $this->db->delete_records('ratingallocate_allocations', $conditions);
     }
 
     /**
