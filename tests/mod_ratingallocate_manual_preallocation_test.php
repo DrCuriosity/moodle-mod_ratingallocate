@@ -115,9 +115,9 @@ class mod_ratingallocate_manual_preallocation_testcase extends advanced_testcase
         $this->teacher = mod_ratingallocate_generator::create_user_and_enrol($this, $course, true);
         $this->setUser($this->teacher);
 
-        $studentcount = 10;
+        $this->studentcount = 10;
         $this->students = array();
-        for ($i = 0; $i < $studentcount; $i++) {
+        for ($i = 0; $i < $this->studentcount; $i++) {
             $student = mod_ratingallocate_generator::create_user_and_enrol($this, $course);
             $this->students[$i] = $student;
         }
@@ -194,30 +194,126 @@ class mod_ratingallocate_manual_preallocation_testcase extends advanced_testcase
         $this->resetAfterTest();
 
         $choices = $this->ratingallocate->get_rateable_choices();
+        // Allocate Student 0 to Choice B.
         $mychoice = array_keys($choices)[1];
+        $this->ratingallocate->add_allocation($mychoice, $this->students[0]->id, true, 'unit test', $this->teacher->id);
         // Non-manual allocation, should not be returned.
-        $this->ratingallocate->add_allocation(array_keys($choices)[0], 1, false);
-        $this->ratingallocate->add_allocation($mychoice, 1, true, 'unit test', $this->teacher->id);
+        $this->ratingallocate->add_allocation(array_keys($choices)[0], $this->students[1]->id, false);
 
-        $preallocs = $this->ratingallocate->get_manual_preallocations();
-        $this->assertEquals(1, count($preallocs));
+        $preallocations = $this->ratingallocate->get_manual_preallocations();
+        $this->assertEquals(1, count($preallocations));
 
-        $alloc = current($preallocs);
+        $alloc = current($preallocations);
         $this->assertEquals(true, $alloc->manual, 'Marked as manual');
+        $this->assertEquals($this->students[0]->id, $alloc->userid, 'Correct student');
         $this->assertEquals($mychoice, $alloc->choiceid, 'Correct choice');
         $this->assertEquals($this->teacher->id, $alloc->allocatorid, 'Correct allocator');
     }
 
-    public function test_prealloc() {
+    public function test_prealloc_preconditions() {
         $this->resetAfterTest();
+
+        $choices = $this->ratingallocate->get_rateable_choices();
+        $choiceids = array_keys($choices);
+
+        $this->make_default_ratings();
+
+        // Allocate Student 0 to Choice A.
+        $mychoice = $choiceids[0];
+        $this->ratingallocate->add_allocation($mychoice, $this->students[0]->id, true, 'unit test', $this->teacher->id);
+
+        // Clear, but preserve manual allocations.
+        $this->ratingallocate->clear_all_allocations(true);
+
+        $ratings = $this->ratingallocate->get_ratings_for_rateable_choices();
+        $defaultratingcount = 9;
+        $this->assertEquals($defaultratingcount, count($ratings), 'All default ratings loaded.');
+
+        /* Not shuffling ratings here, as we want to test the following case:
+         * - Student 0 preallocated to Choice A.
+         * - Student 1 rates A, -D
+         * - Student 6 rates A, D
+         *
+         * Only Student 1 should be allocated to A, as the choice only has 1 'slot' left.
+         */
+        $distributor = new solver_edmonds_karp();
+
+        $preallocations = $this->ratingallocate->get_manual_preallocations();
+        $this->assertEquals(1, count($preallocations), 'Manual preallocation not cleared.');
+        // var_dump($preallocations);
+
+        $preallocuserids = array_unique(array_map(function ($obj) { return $obj->userid; }, $preallocations));
+        $this->assertTrue(in_array($this->students[0]->id, $preallocuserids), 'Student 0 is preallocated.');
+        // var_dump($preallocuserids);
+
+        $filteredratings = $distributor->filter_by_userids($ratings, 'userid', $preallocuserids);
+        $this->assertEquals($defaultratingcount - 1, count($filteredratings), '1 rating from preallocated user removed.');
+
+        $raters = $this->ratingallocate->get_raters_in_course();
+        $this->assertEquals($this->studentcount, count($raters), 'All students are raters.');
+
+        $filteredraters = $distributor->filter_by_userids($raters, 'id', $preallocuserids);
+        $this->assertEquals($this->studentcount - 1, count($filteredraters), 'Preallocated user removed from raters.');
+
+        $this->assertEquals(2, $choices[$mychoice]->maxsize, 'Before adjustment, Choice A maxsize = 2');
+        $distributor->adjust_choice_maxima($choices, $preallocations);
+        $this->assertEquals(1, $choices[$mychoice]->maxsize, 'After adjustment, Choice A maxsize = 1');
+
+        $distributions = $distributor->compute_distribution($choices, $filteredratings, count($filteredraters));
+        ksort($distributions);
+
+        $this->assertNotContains($this->students[0]->id, $distributions[$choiceids[0]],
+            'Preallocated choice not in computed distribution.');
+        $this->assertContains($this->students[1]->id, $distributions[$choiceids[0]]);
+        $this->assertNotContains($this->students[6]->id, $distributions[$choiceids[0]],
+            'No overflow in choice with preallocated user.');
+
+        // Everything else still allocated as before preallocation.
+        $this->assertContains($this->students[2]->id, $distributions[$choiceids[1]]);
+        $this->assertContains($this->students[3]->id, $distributions[$choiceids[1]]);
+        $this->assertContains($this->students[4]->id, $distributions[$choiceids[2]]);
+        $this->assertContains($this->students[5]->id, $distributions[$choiceids[2]]);
+        $this->assertContains($this->students[6]->id, $distributions[$choiceids[3]]);
     }
 
+    public function test_prealloc_execution() {
+        $this->resetAfterTest();
+
+        $choices = $this->ratingallocate->get_rateable_choices();
+        $choiceids = array_keys($choices);
+
+        $this->make_default_ratings();
+
+        // Allocate Student 0 to Choice A.
+        $mychoice = $choiceids[0];
+        $this->ratingallocate->add_allocation($mychoice, $this->students[0]->id, true, 'unit test', $this->teacher->id);
+
+        $distributor = new solver_edmonds_karp();
+        $distributor->distribute_users($this->ratingallocate);
+
+        $allocationrecords = $this->ratingallocate->db->get_records('ratingallocate_allocations', array(
+            'ratingallocateid' => $this->ratingallocate->ratingallocate->id
+        ));
+        $allocations = $this->get_allocation_strings($allocationrecords);
+
+        $this->assertContains($this->students[0]->id . " -> " . $choiceids[0], $allocations,
+            'Preallocated choice in allocations.');
+        $this->assertContains($this->students[1]->id . " -> " . $choiceids[0], $allocations);
+        $this->assertNotContains($this->students[6]->id . " -> " . $choiceids[0], $allocations,
+            'No overflow in choice with preallocated user.');
+
+        // Everything else still allocated as before preallocation.
+        $this->assertContains($this->students[2]->id . " -> " . $choiceids[1], $allocations);
+        $this->assertContains($this->students[3]->id . " -> " . $choiceids[1], $allocations);
+        $this->assertContains($this->students[4]->id . " -> " . $choiceids[2], $allocations);
+        $this->assertContains($this->students[5]->id . " -> " . $choiceids[2], $allocations);
+        $this->assertContains($this->students[6]->id . " -> " . $choiceids[3], $allocations);
+    }
             /**
              * TODO: Eventually, this ought to:
              * - Check a few manual pre-allocations exist before and after solving.
              * - Check that the number of pre-allocations and allocations matches up with the allowed maximum
-             * - Ensure that choices that are "full" aren't presented to the solver.
-             * - Ensure that choices that are partially full are given a reduced maximum in the solver.
+             * - Ensure that choices that are "full" are presented to the solver with 0 size
              * - Once the allocations are all behaving properly, ensure that groups are created from both
              *   the pre-allocated and the solver-allocated members.
              *

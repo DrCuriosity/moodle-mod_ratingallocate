@@ -87,22 +87,33 @@ class distributor {
      */
     public function distribute_users(\ratingallocate $ratingallocate) {
         // Extend PHP time limit
-//        core_php_time_limit::raise();
+        // core_php_time_limit::raise();
 
         // Load data from database
         $choicerecords = $ratingallocate->get_rateable_choices();
         $ratings = $ratingallocate->get_ratings_for_rateable_choices();
 
+        // Fetch pre-allocated choices.
+        $preallocations = $ratingallocate->get_manual_preallocations();
+        $preallocuserids = array_unique(array_map(function ($obj) { return $obj->userid; }, $preallocations));
+
+        // Filter preallocated users out of ratings.
+        $ratings = $this->filter_by_userids($ratings, 'userid', $preallocuserids);
+
         // Randomize the order of the enrties to prevent advantages for early entry
         shuffle($ratings);
 
-        $usercount = count($ratingallocate->get_raters_in_course());
+        $usercount = count($this->filter_by_userids($ratingallocate->get_raters_in_course(), 'id', $preallocuserids));
+
+        // Adjust maxsize counts down by preallocated choices.
+        $this->adjust_choice_maxima($choicerecords, $preallocations);
 
         $distributions = $this->compute_distribution($choicerecords, $ratings, $usercount);
 
         $transaction = $ratingallocate->db->start_delegated_transaction(); // perform all allocation manipulation / inserts in one transaction
 
-        $ratingallocate->clear_all_allocations();
+        // Maintain existing pre-allocations.
+        $ratingallocate->clear_all_allocations(true);
 
         foreach ($distributions as $choiceid => $users) {
             foreach ($users as $userid) {
@@ -110,6 +121,26 @@ class distributor {
             }
         }
         $transaction->allow_commit();
+    }
+
+    /**
+     * Adjust maxsize values of each manual pre-allocation's choice.
+     *
+     * Warning: do not commit these choice records once adjustment has occurred.
+     *
+     * @param array[\ratingallocate_choice] $choicerecords
+     * @param array $allocations An array of allocation records.
+     */
+    public function adjust_choice_maxima(&$choicerecords, $allocations) {
+        foreach ($allocations as $allocid => $allocation) {
+            // Sanity check: only alter on manual pre-allocations.
+            if ($allocation->manual) {
+                // Decrement maxsize for this allocation's choice record.
+                if ($choicerecords[$allocation->choiceid]->maxsize > 0) {
+                    $choicerecords[$allocation->choiceid]->maxsize--;
+                }
+            }
+        }
     }
 
     /**
