@@ -97,16 +97,17 @@ class distributor {
         $preallocations = $ratingallocate->get_manual_preallocations();
         $preallocuserids = array_unique(array_map(function ($obj) { return $obj->userid; }, $preallocations));
 
-        // Filter preallocated users out of ratings.
-        $ratings = $this->filter_by_userids($ratings, 'userid', $preallocuserids);
+        // Filter any preallocated users out of the rating records.
+        $ratings = $this->filter_by_ids($ratings, 'userid', $preallocuserids);
 
-        // Randomize the order of the enrties to prevent advantages for early entry
+        // Randomize the order of the entries to prevent advantages for early entry
         shuffle($ratings);
 
-        $usercount = count($this->filter_by_userids($ratingallocate->get_raters_in_course(), 'id', $preallocuserids));
+        // Count remaining users after pre-allocations.
+        $usercount = count($this->filter_by_ids($ratingallocate->get_raters_in_course(), 'id', $preallocuserids));
 
-        // Adjust maxsize counts down by preallocated choices.
-        $this->adjust_choice_maxima($choicerecords, $preallocations);
+        // Adjust maxsize counts down by preallocated choices, remove full choices.
+        $this->adjust_for_preallocations($choicerecords, $preallocations, $ratings);
 
         $distributions = $this->compute_distribution($choicerecords, $ratings, $usercount);
 
@@ -126,35 +127,69 @@ class distributor {
     /**
      * Adjust maxsize values of each manual pre-allocation's choice.
      *
-     * Warning: do not commit these choice records once adjustment has occurred.
+     * Since a maxsize of 0 means no limit, we need to explicitly remove
+     * any choices that get filled up.
+     *
+     * It may be possible to pre-allocate a number of users over the specified
+     * maxsize value. The function assumes this case will have been validated
+     * earlier if that case is a problem.
+     *
+     * Warning: this function alters data in place. Do not commit from the
+     * choice records array once adjustment has occurred, or the original maxsize
+     * values may be lost.
      *
      * @param array[\ratingallocate_choice] $choicerecords
      * @param array $allocations An array of allocation records.
+     * @param array $ratings An array of rating records.
      */
-    public function adjust_choice_maxima(&$choicerecords, $allocations) {
+    public function adjust_for_preallocations(&$choicerecords, $allocations, &$ratings) {
+        $choiceidstoremove = array();
+
         foreach ($allocations as $allocid => $allocation) {
             // Sanity check: only alter on manual pre-allocations.
             if ($allocation->manual) {
+                $choicerecord = $choicerecords[$allocation->choiceid];
+
                 // Decrement maxsize for this allocation's choice record.
-                if ($choicerecords[$allocation->choiceid]->maxsize > 0) {
-                    $choicerecords[$allocation->choiceid]->maxsize--;
+                if ($choicerecord->maxsize > 1) {
+                    $choicerecord->maxsize--;
+                } else if ($choicerecords[$allocation->choiceid]->maxsize == 1) {
+                    $choicerecord->maxsize--;
+                    // If completely filled, flag the choice for removal.
+                    $choiceidstoremove[] = $allocation->choiceid;
                 }
             }
         }
+
+        // Remove any ratings that opt for a removed choice.
+        $ratings = $this->filter_by_ids($ratings, 'choiceid', $choiceidstoremove);
+
+        // Remove all completely full choices.
+        foreach ($choiceidstoremove as $choiceid)
+        {
+            unset($choicerecords[$choiceid]);
+        };
     }
 
     /**
-     * Filter an array to remove items for any preallocated userids.
+     * Filter an array to remove any items that match a list of target IDs.
      *
-     * @param array[object] $objects Array of objects with userids.
+     * @param array[object] $objects Array of objects with ids
      * @param string $keyname Key to match against
-     * @param array[string] $userids
+     * @param array[string] $ids Array of ids to filter out
      *
-     * @return array[object] Array of filtered ratings.
+     * @return array[object] Filtered array of objects with ids.
+     *
+     * Example:
+     *
+     * $filteredrecords = filter_ids($records, 'userid', $ids);
+     *
+     * This will return a list of all records that have a 'userid' value that
+     * is not in the $ids array.
      */
-    public function filter_by_userids($objects, $keyname, $userids) {
-        return array_filter($objects, function ($obj) use ($keyname, $userids) {
-            return !in_array(get_object_vars($obj)[$keyname], $userids);
+    public function filter_by_ids($objects, $keyname, $ids) {
+        return array_filter($objects, function ($obj) use ($keyname, $ids) {
+            return !in_array(get_object_vars($obj)[$keyname], $ids);
         });
     }
 

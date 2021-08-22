@@ -240,23 +240,21 @@ class mod_ratingallocate_manual_preallocation_testcase extends advanced_testcase
 
         $preallocations = $this->ratingallocate->get_manual_preallocations();
         $this->assertEquals(1, count($preallocations), 'Manual preallocation not cleared.');
-        // var_dump($preallocations);
 
         $preallocuserids = array_unique(array_map(function ($obj) { return $obj->userid; }, $preallocations));
         $this->assertTrue(in_array($this->students[0]->id, $preallocuserids), 'Student 0 is preallocated.');
-        // var_dump($preallocuserids);
 
-        $filteredratings = $distributor->filter_by_userids($ratings, 'userid', $preallocuserids);
+        $filteredratings = $distributor->filter_by_ids($ratings, 'userid', $preallocuserids);
         $this->assertEquals($defaultratingcount - 1, count($filteredratings), '1 rating from preallocated user removed.');
 
         $raters = $this->ratingallocate->get_raters_in_course();
         $this->assertEquals($this->studentcount, count($raters), 'All students are raters.');
 
-        $filteredraters = $distributor->filter_by_userids($raters, 'id', $preallocuserids);
+        $filteredraters = $distributor->filter_by_ids($raters, 'id', $preallocuserids);
         $this->assertEquals($this->studentcount - 1, count($filteredraters), 'Preallocated user removed from raters.');
 
         $this->assertEquals(2, $choices[$mychoice]->maxsize, 'Before adjustment, Choice A maxsize = 2');
-        $distributor->adjust_choice_maxima($choices, $preallocations);
+        $distributor->adjust_for_preallocations($choices, $preallocations, $filteredratings);
         $this->assertEquals(1, $choices[$mychoice]->maxsize, 'After adjustment, Choice A maxsize = 1');
 
         $distributions = $distributor->compute_distribution($choices, $filteredratings, count($filteredraters));
@@ -274,6 +272,52 @@ class mod_ratingallocate_manual_preallocation_testcase extends advanced_testcase
         $this->assertContains($this->students[4]->id, $distributions[$choiceids[2]]);
         $this->assertContains($this->students[5]->id, $distributions[$choiceids[2]]);
         $this->assertContains($this->students[6]->id, $distributions[$choiceids[3]]);
+    }
+
+    /**
+     * Ensure that choices that are "full" from preallocation are not presented to the solver.
+     */
+    public function test_fill_choices() {
+        $this->resetAfterTest();
+
+        $distributor = new solver_edmonds_karp();
+
+        $choices = $this->ratingallocate->get_rateable_choices();
+        $choiceids = array_keys($choices);
+
+        $this->make_default_ratings();
+
+        // Pre-allocate both Student 0 and 1 to Choice A.
+        $mychoice = $choiceids[0];
+        $this->ratingallocate->add_allocation($mychoice, $this->students[0]->id, true, 'unit test', $this->teacher->id);
+        $this->ratingallocate->add_allocation($mychoice, $this->students[1]->id, true, 'unit test', $this->teacher->id);
+        $this->assertContains($mychoice, array_keys($choices), 'Filled choice exists before adjustment.');
+
+        $preallocations = $this->ratingallocate->get_manual_preallocations();
+        $preallocuserids = array_unique(array_map(function ($obj) { return $obj->userid; }, $preallocations));
+
+        // Check with sorted ratings for unit test consistency purposes.
+        $ratings = $this->ratingallocate->get_ratings_for_rateable_choices();
+        $ratings = $distributor->filter_by_ids($ratings, 'userid', $preallocuserids);
+        ksort($ratings);
+
+        $distributor->adjust_for_preallocations($choices, $preallocations, $ratings);
+
+        $this->assertNotContains($mychoice, array_keys($choices), 'Filled choice does not exist after adjustment.');
+
+        $disribution = $distributor->distribute_users($this->ratingallocate);
+
+        $allocationrecords = $this->ratingallocate->db->get_records('ratingallocate_allocations');
+        $allocations = $this->get_allocation_strings($allocationrecords);
+
+        $this->assertContains($this->students[0]->id . " -> " . $mychoice, $allocations,
+            'Student 1 preallocated to Choice A');
+        $this->assertContains($this->students[1]->id . " -> " . $mychoice, $allocations,
+            'Student 2 preallocated to Choice A');
+        $this->assertNotContains($this->students[6]->id . " -> " . $mychoice, $allocations,
+            'Student 7 not allocated to Choice A (already full)');
+        $this->assertEquals(7, count($allocations),
+            'Allocations made for all students with ratings or pre-allocations.');
     }
 
     public function test_prealloc_execution() {
@@ -296,10 +340,10 @@ class mod_ratingallocate_manual_preallocation_testcase extends advanced_testcase
         ));
         $allocations = $this->get_allocation_strings($allocationrecords);
 
-        $this->assertContains($this->students[0]->id . " -> " . $choiceids[0], $allocations,
+        $this->assertContains($this->students[0]->id . " -> " . $mychoice, $allocations,
             'Preallocated choice in allocations.');
-        $this->assertContains($this->students[1]->id . " -> " . $choiceids[0], $allocations);
-        $this->assertNotContains($this->students[6]->id . " -> " . $choiceids[0], $allocations,
+        $this->assertContains($this->students[1]->id . " -> " . $mychoice, $allocations);
+        $this->assertNotContains($this->students[6]->id . " -> " . $mychoice, $allocations,
             'No overflow in choice with preallocated user.');
 
         // Everything else still allocated as before preallocation.
@@ -311,9 +355,6 @@ class mod_ratingallocate_manual_preallocation_testcase extends advanced_testcase
     }
             /**
              * TODO: Eventually, this ought to:
-             * - Check a few manual pre-allocations exist before and after solving.
-             * - Check that the number of pre-allocations and allocations matches up with the allowed maximum
-             * - Ensure that choices that are "full" are presented to the solver with 0 size
              * - Once the allocations are all behaving properly, ensure that groups are created from both
              *   the pre-allocated and the solver-allocated members.
              *
