@@ -190,7 +190,25 @@ $string['modify_choices_group_desc_published'] = 'The allocations have been publ
 $string['err_positivnumber'] = 'You must supply a positive number here.';
 $string['saveandnext'] = 'Save and add next';
 $string['choice_added_notification'] = 'Choice saved.';
+$string['preallocate_users'] = 'Preallocate users';
 
+// </editor-fold>
+
+// <editor-fold defaultstate="collapsed" desc="Form to preallocate users to choices (administrator)">
+$string['preallocate_users_for_choice'] = 'Preallocate users for {$a}';
+$string['preallocate_selectusers'] = 'Select users to allocate';
+$string['preallocate_maxsize'] = 'A maximum of {$a} users should be allocated to this choice.';
+$string['preallocate_reason'] = 'Reasons';
+$string['preallocate_reasonexplanation'] = 'Reasons will be applied to all selected users above.';
+$string['preallocate_table'] = 'Preallocated users';
+$string['preallocate_table_noneyet'] = 'No users preallocated to this choice yet.';
+$string['preallocate_header_user_name'] = 'Name';
+$string['preallocate_header_user_idnumber'] = 'ID Number';
+$string['preallocate_header_user_email'] = 'Email address';
+$string['preallocate_header_reason'] = 'Allocation Reasons';
+$string['preallocate_header_allocator'] = 'Allocator';
+$string['preallocate_header_action'] = 'Action';
+$string['preallocate_deleteconfirm'] = 'Do you really want to remove preallocation for {$a}?';
 // </editor-fold>
 
 // <editor-fold defaultstate="collapsed" desc="Form to edit the instance(administrator)">

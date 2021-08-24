@@ -532,6 +532,7 @@ class mod_ratingallocate_renderer extends plugin_renderer_base {
         }
         $tools .= $this->format_icon_link(ACTION_DELETE_CHOICE, $id, 't/delete', get_string('delete_choice', ratingallocate_MOD_NAME),
             new \confirm_action(get_string('deleteconfirm', ratingallocate_MOD_NAME, $title)));
+        $tools .= $this->format_icon_link(ACTION_PREALLOCATE_CHOICE, $id, 't/enrolusers', get_string('preallocate_users', 'mod_ratingallocate'));
 
         return $tools;
     }
@@ -542,15 +543,21 @@ class mod_ratingallocate_renderer extends plugin_renderer_base {
      * @param string $choice URL parameter to include in the link
      * @param string $icon The key to the icon to use (e.g. 't/up')
      * @param string $alt The string description of the link used as the title and alt text
+     * @param string $confirm Confirmation string (e.g. for deletions)
+     * @param string $allocation URL parameter to include in the link for preallocation actions.
      * @return string The icon/link
      */
-    private function format_icon_link($action, $choice, $icon, $alt, $confirm = null) {
+    private function format_icon_link($action, $choice, $icon, $alt, $confirm = null, $allocation = null) {
         global $OUTPUT, $PAGE;
 
         $url = $PAGE->url;
+        $fields = array('action' => $action, 'choiceid' => $choice, 'sesskey' => sesskey());
+        if ($allocation) {
+            $fields['allocation'] = $allocation;
+        }
 
         return $OUTPUT->action_icon(new \moodle_url($url,
-            array('action' => $action, 'choiceid' => $choice, 'sesskey' => sesskey())),
+            $fields),
             new \pix_icon($icon, $alt, 'moodle', array('title' => $alt)),
             $confirm , array('title' => $alt)) . ' ';
     }
@@ -707,6 +714,60 @@ class mod_ratingallocate_renderer extends plugin_renderer_base {
         $output .= $this->box_end();
 
         return $output;
+    }
+
+    /**
+     * Render table for preallocated users.
+     *
+     * @param ratingallocate $ratingallocate
+     * @param ratingallocate_choice $choice
+     * @param ratingallocate_allocations $preallocations
+     * @return string HTML code for table
+     */
+    public function ratingallocate_preallocations_table($ratingallocate, $choice, $preallocations) {
+
+        $output = $this->heading(get_string('preallocate_table', 'mod_ratingallocate'), 2);
+        $output .= $this->box_start();
+        if($preallocations) {
+            $table = new html_table();
+            $table->head = array(
+                get_string('preallocate_header_user_name', 'mod_ratingallocate'),
+                get_string('preallocate_header_user_idnumber', 'mod_ratingallocate'),
+                get_string('preallocate_header_user_email', 'mod_ratingallocate'),
+                get_string('preallocate_header_reason', 'mod_ratingallocate'),
+                get_string('preallocate_header_allocator', 'mod_ratingallocate'),
+                get_string('preallocate_header_action', 'mod_ratingallocate'),
+            );
+
+            foreach($preallocations as $pre) {
+                $person = core_user::get_user($pre->userid);
+                $allocator = core_user::get_user($pre->allocatorid);
+                $deletebutton = $this->format_icon_link(
+                    ACTION_PREALLOCATE_DELETE,
+                    $id,
+                    't/delete',
+                    get_string('delete_choice', 'mod_ratingallocate'),
+                    new \confirm_action(get_string('preallocate_deleteconfirm', 'mod_ratingallocate', fullname($person))),
+                    $pre->id);
+                $row = new html_table_row();
+                $row->cells = array(
+                    new html_table_cell(fullname($person)),
+                    new html_table_cell($person->idnumber),
+                    new html_table_cell($person->email),
+                    new html_table_cell($pre->reason),
+                    new html_table_cell(fullname($allocator)),
+                    new html_table_cell($deletebutton),
+                );
+                $table->data[] = $row;
+            }
+            $output .= html_writer::table($table);
+        } else {
+            $output .= \html_writer::div(get_string('preallocate_table_noneyet', 'mod_ratingallocate'));
+        }
+        $output .= $this->box_end();
+
+        return $output;
+
     }
 
     /**
