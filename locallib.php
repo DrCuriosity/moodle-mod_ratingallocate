@@ -615,6 +615,53 @@ class ratingallocate {
         return $output;
     }
 
+    private function process_action_preallocate_remove() {
+        $output = '';
+
+        if (has_capability('mod/ratingallocate:modify_choices', $this->context)) {
+            global $DB;
+            $choiceid = optional_param('choiceid', 0, PARAM_INT);
+            $allocationid = optional_param('allocation', 0, PARAM_INT);
+
+            // Defaults until changed.
+            $notification = get_string('preallocate_removed_notification_missing', 'mod_ratingallocate');
+            $status = \core\output\notification::NOTIFY_ERROR;
+
+            if ($choiceid && $allocationid) {
+                $choicerecord = $DB->get_record(this_db\ratingallocate_choices::TABLE, array('id' => $choiceid));
+                $choice = new ratingallocate_choice($choicerecord);
+
+                // Choice ID is not strictly needed here, but included for data validation.
+                $allocation = $DB->get_record(this_db\ratingallocate_allocations::TABLE, array('id' => $allocationid, 'choiceid' => $choiceid));
+                if ($allocation) {
+                    if ($allocation->manual) {
+                        $DB->delete_records(this_db\ratingallocate_allocations::TABLE, array('id' => $allocationid, 'choiceid' => $choiceid));
+
+                        $foruser = core_user::get_user($allocation->userid);
+                        $notification = get_string('preallocate_removed_notification', 'mod_ratingallocate', array(
+                            'user' => fullname($foruser),
+                            'choice' => $choice->title,
+
+                        ));
+                        $status = \core\output\notification::NOTIFY_SUCCESS;
+                    } else {
+                        $notification = get_string('preallocate_removed_notification_nonmanual', 'mod_ratingallocate');
+                    }
+                }
+
+                redirect(new moodle_url('/mod/ratingallocate/view.php',
+                    array('id' => $this->coursemodule->id, 'action' => ACTION_PREALLOCATE_CHOICE, 'choiceid' => $choiceid)),
+                    $notification,
+                    null,
+                    $status);
+            }
+            redirect(new moodle_url('/mod/ratingallocate/view.php',
+                array('id' => $this->coursemodule->id, 'action' => ACTION_SHOW_CHOICES)));
+        }
+
+        return $output;
+    }
+
     private function process_action_show_ratings_and_alloc_table() {
         $output = '';
         // Print ratings table.
@@ -825,11 +872,9 @@ class ratingallocate {
                 $this->showinfo = false;
                 break;
 
-            case ACTION_PREALLOCATE_DELETE:
-                // TODO: Implement this to delete preallocated choices.
-                echo "TODO: Implement this to delete preallocated choices.";
-                die();
-                break;
+            case ACTION_PREALLOCATE_REMOVE:
+                $this->process_action_preallocate_remove();
+                return "";
 
             case ACTION_SHOW_RATINGS_AND_ALLOCATION_TABLE:
                 $output .= $this->process_action_show_ratings_and_alloc_table();

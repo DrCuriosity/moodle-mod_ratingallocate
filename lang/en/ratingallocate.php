@@ -208,7 +208,11 @@ $string['preallocate_header_user_email'] = 'Email address';
 $string['preallocate_header_reason'] = 'Allocation Reasons';
 $string['preallocate_header_allocator'] = 'Allocator';
 $string['preallocate_header_action'] = 'Action';
-$string['preallocate_deleteconfirm'] = 'Do you really want to remove preallocation for {$a}?';
+$string['preallocate_removeallocation'] = 'Remove Allocation';
+$string['preallocate_removeconfirm'] = 'Do you really want to remove preallocation for "{$a}"?';
+$string['preallocate_removed_notification'] = 'Preallocation for user "{$a->user}" removed from choice "{$a->choice}".';
+$string['preallocate_removed_notification_missing'] = 'The preallocation requested for removal could not be found.';
+$string['preallocate_removed_notification_nonmanual'] = 'The allocation requested for removal is not a manual preallocation.';
 // </editor-fold>
 
 // <editor-fold defaultstate="collapsed" desc="Form to edit the instance(administrator)">

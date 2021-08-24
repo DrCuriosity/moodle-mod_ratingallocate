@@ -743,11 +743,11 @@ class mod_ratingallocate_renderer extends plugin_renderer_base {
                 $person = core_user::get_user($pre->userid);
                 $allocator = core_user::get_user($pre->allocatorid);
                 $deletebutton = $this->format_icon_link(
-                    ACTION_PREALLOCATE_DELETE,
-                    $id,
-                    't/delete',
-                    get_string('delete_choice', 'mod_ratingallocate'),
-                    new \confirm_action(get_string('preallocate_deleteconfirm', 'mod_ratingallocate', fullname($person))),
+                    ACTION_PREALLOCATE_REMOVE,
+                    $choice->id,
+                    't/removecontact',
+                    get_string('preallocate_removeallocation', 'mod_ratingallocate'),
+                    new \confirm_action(get_string('preallocate_removeconfirm', 'mod_ratingallocate', fullname($person))),
                     $pre->id);
                 $row = new html_table_row();
                 $row->cells = array(
