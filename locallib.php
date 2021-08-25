@@ -755,13 +755,31 @@ class ratingallocate {
     }
 
     private function process_default() {
-        global $OUTPUT;
+        global $OUTPUT, $USER;
         $output = '';
         /* @var mod_ratingallocate_renderer */
         $renderer = $this->get_renderer();
         $status = $this->get_status();
         if (has_capability('mod/ratingallocate:give_rating', $this->context, null, false)) {
-            if ($status === self::DISTRIBUTION_STATUS_RATING_IN_PROGRESS) {
+            // Check for preallocated choice before presenting rating options.
+            $preallocation = $this->db->get_record(this_db\ratingallocate_allocations::TABLE, array(
+                this_db\ratingallocate_allocations::RATINGALLOCATEID => $this->ratingallocateid,
+                this_db\ratingallocate_allocations::MANUAL => 1,
+                this_db\ratingallocate_allocations::USERID => $USER->id,
+            ));
+            if ($preallocation) {
+                $choice = $this->db->get_record(this_db\ratingallocate_choices::TABLE, array(
+                    this_db\ratingallocate_choices::ID => $preallocation->choiceid,
+                ));
+
+                $allocator = core_user::get_user($preallocation->allocatorid);
+
+                $output .= get_string('preallocated_to_choice', 'mod_ratingallocate', array(
+                    'choice' => $choice->title,
+                    'allocator' => fullname($allocator),
+                ));
+
+            } else if ($status === self::DISTRIBUTION_STATUS_RATING_IN_PROGRESS) {
                 if ($this->is_setup_ok()) {
                     $output .= $OUTPUT->single_button(new moodle_url('/mod/ratingallocate/view.php',
                     array('id' => $this->coursemodule->id,
