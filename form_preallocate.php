@@ -62,6 +62,10 @@ class preallocate_form extends moodleform {
         $mform->setType('choiceid', PARAM_TEXT);
         $mform->setDefault('choiceid', $this->choice->id);
 
+        $mform->addElement('hidden', 'ratingallocateid');
+        $mform->setType('ratingallocateid', PARAM_TEXT);
+        $mform->setDefault('ratingallocateid', $this->ratingallocate->ratingallocate->id);
+
         $element = 'userselector';
         $options = array(
             'ajax' => 'mod_ratingallocate/form-user-selector',
