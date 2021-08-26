@@ -62,12 +62,31 @@ class preallocate_form extends moodleform {
         $mform->setType('choiceid', PARAM_TEXT);
         $mform->setDefault('choiceid', $this->choice->id);
 
-
         $element = 'userselector';
-        $mform->addElement('static', $element, get_string('preallocate_selectusers', 'mod_ratingallocate'), '*** User selector here');
+        $options = array(
+            'ajax' => 'mod_ratingallocate/form-user-selector',
+            'multiple' => true,
+            'courseid' => $COURSE->id,
+            'ratingallocateid' => $this->ratingallocate->ratingallocate->id,
+            'choiceid' => $this->choice->id,
+            'valuehtmlcallback' => function($value) {
+                global $OUTPUT;
+
+                $userfieldsapi = \core_user\fields::for_name();
+                $allusernames = $userfieldsapi->get_sql('', false, '', '', false)->selects;
+                $fields = 'id, ' . $allusernames;
+                $user = \core_user::get_user($value, $fields);
+                $useroptiondata = array(
+                    'fullname' => fullname($user),
+                );
+                return $OUTPUT->render_from_template('mod_ratingallocate/form-user-selector-suggestion', $useroptiondata);
+            },
+        );
+        $mform->addElement('autocomplete', $element, get_string('users'), [], $options);
 
         $element = 'maxsize';
-        $mform->addElement('static', $element, null, get_string('preallocate_maxsize', 'mod_ratingallocate', $this->choice->maxsize));
+        $mform->addElement('static', $element, null,
+            get_string('preallocate_maxsize', 'mod_ratingallocate', $this->choice->maxsize));
 
         $element = 'reason';
         $mform->addElement('text', $element, get_string('preallocate_reason', 'mod_ratingallocate'));
@@ -97,5 +116,4 @@ class preallocate_form extends moodleform {
         $o .= $this->_form->toHtml();
         return $o;
     }
-
 }
