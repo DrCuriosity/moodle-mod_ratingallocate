@@ -955,6 +955,9 @@ class ratingallocate {
             $choicestatus->own_choices = $this->get_rating_data_for_user($USER->id);
             // Filter choices to display by groups, where 'usegroups' is true.
             $choicestatus->own_choices = $this->filter_choices_by_groups($choicestatus->own_choices, $USER->id);
+            // Filter choices that are already full due to preallocations.
+            $choicestatus->own_choices = $this->filter_choices_by_full_preallocations($choicestatus->own_choices);
+
             $choicestatus->allocations = $this->get_allocations_for_user($USER->id);
             $choicestatus->strategy = $this->get_strategy_class();
             $choicestatus->show_distribution_info = has_capability('mod/ratingallocate:start_distribution', $this->context);
@@ -1509,6 +1512,45 @@ class ratingallocate {
                     $filteredchoices[$choiceid] = $choice;
                 }
             } else {
+                $filteredchoices[$choiceid] = $choice;
+            }
+        }
+
+        return $filteredchoices;
+    }
+
+    /**
+     * Fetches a count of preallocated users for all choice IDs in rating.
+     */
+    public function get_preallocation_counts() {
+        $sql = 'SELECT choiceid, COUNT(userid)
+            FROM {ratingallocate_allocations}
+            WHERE ratingallocateid=:ratingallocateid
+            AND manual=1
+            GROUP BY choiceid';
+
+        $countrecords = $this->db->get_records_sql($sql, array(
+            'ratingallocateid' => $this->ratingallocateid
+        ));
+        $counts = array();
+        foreach($countrecords as $record) {
+            $counts[$record->choiceid] = $record->count;
+        }
+        return $counts;
+    }
+
+    /**
+     * Filters an array of choices, removing any with full preallocations.
+     *
+     * @param array $choices An array of objects, keyed by ID.
+     * @return array A filtered array of choices, keyed by ID.
+     */
+    public function filter_choices_by_full_preallocations($choices) {
+        $filteredchoices = array();
+        $preallocationcounts = $this->get_preallocation_counts();
+
+        foreach ($choices as $choiceid => $choice) {
+            if ($preallocationcounts[$choiceid] < $choice->maxsize) {
                 $filteredchoices[$choiceid] = $choice;
             }
         }
