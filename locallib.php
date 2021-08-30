@@ -1593,7 +1593,7 @@ class ratingallocate {
         $preallocationcounts = $this->get_preallocation_counts();
 
         foreach ($choices as $choiceid => $choice) {
-            if ($preallocationcounts[$choiceid] < $choice->maxsize) {
+            if (empty($preallocationcounts[$choiceid]) || $preallocationcounts[$choiceid] < $choice->maxsize) {
                 $filteredchoices[$choiceid] = $choice;
             }
         }
