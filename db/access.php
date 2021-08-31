@@ -101,6 +101,14 @@ $capabilities = array(
             'manager' => CAP_ALLOW
         )
     ),
+    'mod/ratingallocate:modify_reasons' => array(
+        'contextlevel' => CONTEXT_MODULE,
+        'captype' => 'write',
+        'archetypes' => array(
+            'editingteacher' => CAP_ALLOW,
+            'manager' => CAP_ALLOW,
+        )
+    ),
 );
 
 
