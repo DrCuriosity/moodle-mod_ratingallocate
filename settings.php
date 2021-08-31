@@ -26,4 +26,10 @@ if ($ADMIN->fulltree) {
             'idnumber'    => new lang_string('idnumber'),
             'email'       => new lang_string('email'),
         ]));
+
+    $settings->add(new admin_setting_configtextarea('ratingallocate_reason_defaults',
+        new lang_string('prereasondefaults', 'ratingallocate'),
+        new lang_string('configprereasondefaults', 'ratingallocate'),
+        ''
+    ));
 }

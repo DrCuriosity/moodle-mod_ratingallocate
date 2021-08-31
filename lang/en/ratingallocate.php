@@ -48,6 +48,8 @@ $string['configalgorithmtimeout'] = 'The time in seconds after which the algorit
 The current run is terminated and marked as failed.';
 $string['downloaduserfields'] = 'Additional user fields for download';
 $string['configdownloaduserfields'] = 'When downloading a table with users in it, these fields may be shown in addition to the users\' first and last name.';
+$string['prereasondefaults'] = 'Default manual pre-allocation reasons';
+$string['configprereasondefaults'] = 'Specify a list of default pre-allocation reasons, separated by line breaks. Course administrators will be able to select one or more reasons when pre-allocating students. This may be overridden at the course level.';
 $string['userid'] = 'User ID';
 // </editor-fold>
 // <editor-fold defaultstate="collapsed" desc="Rating Form for Users">
