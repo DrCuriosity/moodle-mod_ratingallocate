@@ -114,6 +114,7 @@ define('ACTION_ALLOCATION_TO_GROUPING', 'allocation_to_gropuping');
  * 0 algorithm has not been running;
  * 1 algorithm running;
  * 2 algorithm finished;
+ * @property string $prereasondefaults
  * @property string $setting
  */
 class ratingallocate_db_wrapper {
@@ -1599,6 +1600,48 @@ class ratingallocate {
         }
 
         return $filteredchoices;
+    }
+
+    /**
+     * Fetch default reasons that a course administrator can supply for pre-allocations they make.
+     *
+     * This will attempt to fetch a local information first.
+     * If none is found, global plugin values will be used.
+     *
+     * @return array An array of reasons.
+     */
+    public function get_preallocation_reason_defaults() {
+        global $CFG;
+
+        $defaultsetting = $this->ratingallocate->prereasondefaults;
+        if (empty($defaultsetting)) {
+            $defaultsetting = $CFG->ratingallocate_reason_defaults;
+            if (empty($defaultsetting)) {
+                return array();
+            }
+        }
+
+        return($this->parse_linebreaks_to_array($defaultsetting));
+    }
+
+    /**
+     * Helper function to clean up line-break-separated setting values.
+     *
+     * Trim excess whitespace and empty lines.
+     *
+     * @param string $settingstring
+     * @return array Array of trimmed and filtered strings from setting value.
+     */
+    private function parse_linebreaks_to_array($settingstring) {
+        $items = array();
+        foreach (explode("\n", $settingstring) as $part) {
+            $part = trim($part);
+            if(!empty($part)) {
+                $items[] = $part;
+            }
+        }
+
+        return $items;
     }
 
     /**

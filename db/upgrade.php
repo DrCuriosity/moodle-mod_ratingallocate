@@ -209,5 +209,20 @@ function xmldb_ratingallocate_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2021072700, 'ratingallocate');
     }
 
+    if ($oldversion < 2021083000) {
+
+        // Define field prereasondefaults to be added to ratingallocate.
+        $table = new xmldb_table('ratingallocate');
+        $field = new xmldb_field('prereasondefaults', XMLDB_TYPE_TEXT, null, null, null, null, null, 'algorithmstatus');
+
+        // Conditionally launch add field prereasondefaults.
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // Ratingallocate savepoint reached.
+        upgrade_mod_savepoint(true, 2021083000, 'ratingallocate');
+    }
+
     return true;
 }

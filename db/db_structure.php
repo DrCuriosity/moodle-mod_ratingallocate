@@ -42,6 +42,7 @@ class ratingallocate {
     const ALGORITHMSTARTTIME = 'algorithmstarttime';
     const RUNALGORITHMBYCRON = 'runalgorithmbycron';
     const ALGORITHMSTATUS = 'algorithmstatus';
+    const PREREASONDEFAULTS = 'prereasondefaults';
 }
 class ratingallocate_choices {
     const TABLE = 'ratingallocate_choices';
