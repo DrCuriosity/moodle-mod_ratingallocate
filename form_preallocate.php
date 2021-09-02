@@ -92,9 +92,36 @@ class preallocate_form extends moodleform {
         $mform->addElement('static', $element, null,
             get_string('preallocate_maxsize', 'mod_ratingallocate', $this->choice->maxsize));
 
-        $element = 'reason';
-        $mform->addElement('text', $element, get_string('preallocate_reason', 'mod_ratingallocate'));
-        $mform->setType($element, PARAM_TEXT);
+        $reasondefaults = $this->ratingallocate->get_preallocation_reason_defaults();
+
+        if ($reasondefaults) {
+            // Checkboxes per default reason.
+            $reasonchecks = array();
+            foreach ($reasondefaults as $i => $reasonoption) {
+                $key = "reasonoption_$i";
+                $reasonchecks[] = $mform->createElement('checkbox', $key, $reasonoption);
+            }
+            $mform->addGroup($reasonchecks, 'reasonch', get_string('preallocate_reason', 'mod_ratingallocate'),
+                null, false);
+            $otherarray = array(
+                $mform->createElement('checkbox', 'othercheck', get_string('preallocate_reasonother', 'mod_ratingallocate')),
+                $mform->createElement('text', 'reason'),
+            );
+            $mform->addGroup($otherarray, 'other', '', '&nbsp;');
+            $mform->setType('other[reason]', PARAM_TEXT);
+            $mform->disabledIf('other[reason]', 'other[othercheck]');
+        } else {
+            // Straight text input for reason.
+            $otherarray = array(
+                $mform->createElement('hidden', 'othercheck'),
+                $mform->createElement('text', 'reason'),
+            );
+            $mform->addGroup($otherarray, 'other', get_string('preallocate_reason', 'mod_ratingallocate'));
+            $mform->setType('other[reason]', PARAM_TEXT);
+            $mform->setType('other[othercheck]', PARAM_BOOL);
+            $mform->setDefault('other[othercheck]', 1);
+
+        }
 
         $mform->addElement('static', 'reasonexplanation', null, get_string('preallocate_reasonexplanation', 'mod_ratingallocate'));
 

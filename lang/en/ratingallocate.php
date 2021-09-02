@@ -202,6 +202,7 @@ $string['preallocate_users_for_choice'] = 'Preallocate users for {$a}';
 $string['preallocate_selectusers'] = 'Select users to allocate';
 $string['preallocate_maxsize'] = 'A maximum of {$a} users should be allocated to this choice.';
 $string['preallocate_reason'] = 'Reasons';
+$string['preallocate_reasonother'] = 'Other:';
 $string['preallocate_reasonexplanation'] = 'Reasons will be applied to all selected users above.';
 $string['preallocate_table'] = 'Preallocated users';
 $string['preallocate_table_noneyet'] = 'No users preallocated to this choice yet.';

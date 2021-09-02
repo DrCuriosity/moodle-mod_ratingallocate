@@ -728,7 +728,7 @@ class mod_ratingallocate_renderer extends plugin_renderer_base {
 
         $output = $this->heading(get_string('preallocate_table', 'mod_ratingallocate'), 2);
         $output .= $this->box_start();
-        if($preallocations) {
+        if ($preallocations) {
             $table = new html_table();
             $table->head = array(
                 get_string('preallocate_header_user_name', 'mod_ratingallocate'),
@@ -739,7 +739,7 @@ class mod_ratingallocate_renderer extends plugin_renderer_base {
                 get_string('preallocate_header_action', 'mod_ratingallocate'),
             );
 
-            foreach($preallocations as $pre) {
+            foreach ($preallocations as $pre) {
                 $person = core_user::get_user($pre->userid);
                 $allocator = core_user::get_user($pre->allocatorid);
                 $deletebutton = $this->format_icon_link(
@@ -754,7 +754,7 @@ class mod_ratingallocate_renderer extends plugin_renderer_base {
                     new html_table_cell(fullname($person)),
                     new html_table_cell($person->idnumber),
                     new html_table_cell($person->email),
-                    new html_table_cell($pre->reason),
+                    new html_table_cell($this->ratingallocate_preallocations_reason_list($ratingallocate, $pre->reason)),
                     new html_table_cell(fullname($allocator)),
                     new html_table_cell($deletebutton),
                 );
@@ -768,6 +768,30 @@ class mod_ratingallocate_renderer extends plugin_renderer_base {
 
         return $output;
 
+    }
+
+    /**
+     * Render one or more reasons.
+     *
+     * If multiple reasons are given, render them as an unordered list for clarity.
+     *
+     * @param ratingallocate $ratingallocate
+     * @param string $reasons Reason(s) given for preallocation, separated by line breaks.
+     * @return void
+     */
+    public function ratingallocate_preallocations_reason_list($ratingallocate, $reasons) {
+        $output = '';
+        $reasonarray = $ratingallocate->parse_linebreaks_to_array($reasons);
+        if (count($reasonarray) == 1) {
+            $output .= $reasons;
+        } else {
+            $output .= \html_writer::start_tag('ul');
+            foreach ($reasonarray as $reason) {
+                $output .= \html_writer::tag('li', $reason);
+            }
+            $output .= \html_writer::end_tag('ul');
+        }
+        return $output;
     }
 
     /**

@@ -573,10 +573,23 @@ class ratingallocate {
                         if ($mform->is_validated()) {
                             $raters = $this->get_raters_in_course();
                             $allpreallocations = $this->get_manual_preallocations();
+                            $reasondefaults = $this->get_preallocation_reason_defaults();
                             $preallocateduserids = $this->get_preallocated_userids($allpreallocations);
                             $newrecords = array();
                             $updaterecords = array();
                             foreach ($data->userselector as $userid) {
+                                // Collate reason information from checkboxes and/or "other" text input.
+                                $reasonarray = array();
+                                foreach ($reasondefaults as $key => $default) {
+                                    if (property_exists($data, "reasonoption_$key")) {
+                                        $reasonarray[] = $default;
+                                    }
+                                }
+                                if (isset($data->other['othercheck'])) {
+                                    $reasonarray[] = $data->other['reason'];
+                                }
+                                $data->reason = implode("\n", $reasonarray);
+
                                 // Only process valid raters.
                                 if (array_key_exists($userid, $raters)) {
                                     $record = array(
@@ -1632,7 +1645,7 @@ class ratingallocate {
      * @param string $settingstring
      * @return array Array of trimmed and filtered strings from setting value.
      */
-    private function parse_linebreaks_to_array($settingstring) {
+    public function parse_linebreaks_to_array($settingstring) {
         $items = array();
         foreach (explode("\n", $settingstring) as $part) {
             $part = trim($part);
