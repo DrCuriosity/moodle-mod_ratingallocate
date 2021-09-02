@@ -68,7 +68,8 @@ class mod_ratingallocate_generator_testcase extends advanced_testcase {
             'notificationsend' => '0',
             'algorithmstarttime' => null,
             'algorithmstatus' => '0',
-            'runalgorithmbycron' => '1'
+            'runalgorithmbycron' => '1',
+            'prereasondefaults' => NULL,
         );
 
         $this->assertEquals(json_decode(json_encode($expected_values_db, false)), reset($records));
