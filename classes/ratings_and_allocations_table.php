@@ -140,6 +140,10 @@ class ratings_and_allocations_table extends \table_sql {
             }
         }
 
+        // Was a pre-allocation made?
+        $columns[] = 'manual';
+        $headers[] = get_string('preallocated', 'ratingallocate');
+
         foreach ($this->choicenames as $choiceid => $choicetitle) {
             $columns[] = self::CHOICE_COL . $choiceid;
             $headers[] = $choicetitle;
@@ -200,11 +204,15 @@ class ratings_and_allocations_table extends \table_sql {
             $allocationsbyuser[$allocation->userid][$allocation->choiceid] = true;
         }
 
+        $preallocations = $this->ratingallocate->get_manual_preallocations();
+        $preallocateduserids = array_keys(array_column($preallocations, 'manual', 'userid'));
+
         // Add rating rows for each user.
         foreach ($users as $user) {
             $userratings        = isset($ratingsbyuser[$user->id]) ? $ratingsbyuser[$user->id] : array();
             $userallocations    = isset($allocationsbyuser[$user->id]) ? $allocationsbyuser[$user->id] : array();
-            $this->add_user_ratings_row($user, $userratings, $userallocations);
+            $userpreallocated   = in_array($user->id, $preallocateduserids) ? get_string('yes') : get_string('no');
+            $this->add_user_ratings_row($user, $userratings, $userallocations, $userpreallocated);
         }
 
         if (!$this->is_downloading()) {
@@ -221,13 +229,20 @@ class ratings_and_allocations_table extends \table_sql {
      * @param $user object of the user for who a row should be added.
      * @param $userratings array consisting of pairs of choiceid to rating for the user.
      * @param $userallocations array constisting of paris of choiceid and allocation of the user.
+     * @param bool $preallocated Whether the user's choice was preallocated.
      */
-    private function add_user_ratings_row($user, $userratings, $userallocations) {
+    private function add_user_ratings_row($user, $userratings, $userallocations, $preallocated = null) {
 
         $row = convert_to_array($user);
 
         if ($this->shownames) {
             $row['fullname'] = $user;
+        }
+
+        if ($preallocated) {
+            $row['manual'] = $preallocated;
+        } else {
+            $row['manual'] = '';
         }
 
         foreach ($userratings as $choiceid => $userrating) {
@@ -271,6 +286,8 @@ class ratings_and_allocations_table extends \table_sql {
         if ($this->shownames) {
             $row[] = get_string('ratings_table_sum_allocations', ratingallocate_MOD_NAME);
         }
+
+        $row[] = '';  // Empty cell for Preallocated field.
 
         foreach ($this->choicesum as $choiceid => $sum) {
             $row[] = get_string(

@@ -176,6 +176,8 @@ It is counting the allocations according to the rating the user has given to the
 </ul>';
 
 $string['rating_raw'] = '{$a}';
+
+$string['preallocated'] = 'Preallocated';
 // </editor-fold>
 // <editor-fold defaultstate="collapsed" desc="Form to edit choices (administrator)">
 $string['delete_choice'] = 'Delete choice';
