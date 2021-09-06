@@ -142,7 +142,7 @@ class allocations_table extends \table_sql {
                             $data[$allocation->choiceid]->users = '';
                         }
 
-                        $data[$allocation->choiceid]->users .= $this->get_user_link($users[$userid]);
+                        $data[$allocation->choiceid]->users .= $this->get_user_link($users[$userid], $allocation->manual);
                     }
                     unset($userwithrating[$userid]);
                 }
@@ -185,9 +185,10 @@ class allocations_table extends \table_sql {
     /**
      * Returns a link to a user profile labeled with the full name of the user.
      * @param $user \stdClass user object.
+     * @param bool $preallocated Whether the user allocation is preallocated of not.
      * @return string HTML code representing the link to the users profile.
      */
-    private function get_user_link($user) {
+    private function get_user_link($user, $preallocated=false) {
         global $COURSE;
         $name = fullname($user);
 
@@ -197,7 +198,13 @@ class allocations_table extends \table_sql {
             $profileurl = new \moodle_url('/user/view.php',
                 array('id' => $user->id, 'course' => $COURSE->id));
         }
-        return \html_writer::link($profileurl, $name);
+
+        $link = \html_writer::link($profileurl, $name);
+        // Add decoration if preallocated.
+        if ($preallocated) {
+            $link .= \html_writer::tag('span', '*', array('title' => get_string('preallocated', 'ratingallocate')));
+        }
+        return \html_writer::span($link);
     }
 
     /**
