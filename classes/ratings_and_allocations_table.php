@@ -161,6 +161,7 @@ class ratings_and_allocations_table extends \table_sql {
         // Set additional table settings.
         $this->sortable(true, 'lastname');
         $this->set_attribute('class', 'ratingallocate_ratings_table');
+        $this->no_sorting('manual');
 
         $this->initialbars(true);
 
