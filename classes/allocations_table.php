@@ -62,6 +62,8 @@ class allocations_table extends \table_sql {
             $this->baseurl = $PAGE->url;
         }
 
+        $preallocations = $this->ratingallocate->get_manual_preallocations();
+
         if ($this->is_downloading()) {
             global $CFG;
             $additionalfields = explode(',', $CFG->ratingallocate_download_userfields);
@@ -85,6 +87,13 @@ class allocations_table extends \table_sql {
                     has_capability('moodle/course:useremail', $this->ratingallocate->get_context())) {
                 $columns[] = 'email';
                 $headers[] = get_string('email');
+            }
+            // If preallocations are used, add appropriate columns for report.
+            if ($preallocations) {
+                $columns[] = 'preallocated';
+                $headers[] = get_string('preallocated', 'ratingallocate');
+                $columns[] = 'reason';
+                $headers[] = get_string('preallocate_reason', 'ratingallocate');
             }
         }
 
@@ -118,12 +127,35 @@ class allocations_table extends \table_sql {
             $this->ratingallocate->get_users_with_ratings());
         $userwithrating = \user_get_users_by_id($userwithratingids);
 
-        if ($this->is_downloading()){
+        if ($this->is_downloading()) {
+            // Fetch preallocation data.
+            $preallocations = $this->ratingallocate->get_manual_preallocations();
+            $preallocateduserids = array_keys(array_column($preallocations, 'manual', 'userid'));
+            if ($preallocations) {
+                foreach ($data as $userid => $row) {
+                    $data[$userid]->preallocated = in_array($userid, $preallocateduserids) ? get_string('yes') : get_string('no');
+                    $target = array_search($userid, array_column($preallocations, 'userid', 'id'));
+                    $reasons = implode(', ', explode("\n", $preallocations[$target]->reason));
+                    $data[$userid]->reason = $reasons;
+                }
+            }
+
             // Search for all users, who rated but were not allocated and add them to the data set.
             foreach ($userwithrating as $userid => $user) {
                 if (!array_key_exists($userid, $data)) {
                     $data[$userid] = $user;
                     $data[$userid]->choicetitle = '';
+                }
+                if ($preallocations) {
+                    if (in_array($userid, $preallocateduserids)) {
+                        $data[$userid]->preallocated = get_string('yes');
+                        $target = array_search($userid, array_column($preallocations, 'userid', 'id'));
+                        $reasons = implode(', ', explode("\n", $preallocations[$target]->reason));
+                        $data[$userid]->reason = $reasons;
+                    } else {
+                        $data[$userid]->preallocated = get_string('no');
+                        $data[$userid]->reason = '';
+                    }
                 }
             }
         } else {
@@ -170,7 +202,7 @@ class allocations_table extends \table_sql {
                     }
                     $noallocation->users .= $this->get_user_link($user);
                 }
-                $data []= $noallocation;
+                $data[] = $noallocation;
             }
         }
 
