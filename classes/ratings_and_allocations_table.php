@@ -141,8 +141,11 @@ class ratings_and_allocations_table extends \table_sql {
         }
 
         // Was a pre-allocation made?
+        $preallocations = $this->ratingallocate->get_manual_preallocations();
         $columns[] = 'manual';
         $headers[] = get_string('preallocated', 'ratingallocate');
+        $columns[] = 'reason';
+        $headers[] = get_string('preallocate_reason', 'ratingallocate');
 
         foreach ($this->choicenames as $choiceid => $choicetitle) {
             $columns[] = self::CHOICE_COL . $choiceid;
@@ -162,6 +165,7 @@ class ratings_and_allocations_table extends \table_sql {
         $this->sortable(true, 'lastname');
         $this->set_attribute('class', 'ratingallocate_ratings_table');
         $this->no_sorting('manual');
+        $this->no_sorting('reason');
 
         $this->initialbars(true);
 
@@ -212,8 +216,17 @@ class ratings_and_allocations_table extends \table_sql {
         foreach ($users as $user) {
             $userratings        = isset($ratingsbyuser[$user->id]) ? $ratingsbyuser[$user->id] : array();
             $userallocations    = isset($allocationsbyuser[$user->id]) ? $allocationsbyuser[$user->id] : array();
-            $userpreallocated   = in_array($user->id, $preallocateduserids) ? get_string('yes') : get_string('no');
-            $this->add_user_ratings_row($user, $userratings, $userallocations, $userpreallocated);
+
+            if (in_array($user->id, $preallocateduserids)) {
+                $userpreallocated = get_string('yes');
+                $target = array_search($user->id, array_column($preallocations, 'userid', 'userid'));
+                $reason = $this->renderer->ratingallocate_preallocations_reason_list($this->ratingallocate, $allocations[$target]->reason);
+            } else {
+                $userpreallocated = get_string('no');
+                $reason = '';
+            }
+
+            $this->add_user_ratings_row($user, $userratings, $userallocations, $userpreallocated, $reason);
         }
 
         if (!$this->is_downloading()) {
@@ -231,8 +244,9 @@ class ratings_and_allocations_table extends \table_sql {
      * @param $userratings array consisting of pairs of choiceid to rating for the user.
      * @param $userallocations array constisting of paris of choiceid and allocation of the user.
      * @param bool $preallocated Whether the user's choice was preallocated.
+     * @param string $reason HTML rendering of one or more reasons for preallocation.
      */
-    private function add_user_ratings_row($user, $userratings, $userallocations, $preallocated = null) {
+    private function add_user_ratings_row($user, $userratings, $userallocations, $preallocated=null, $reason=null) {
 
         $row = convert_to_array($user);
 
@@ -240,10 +254,9 @@ class ratings_and_allocations_table extends \table_sql {
             $row['fullname'] = $user;
         }
 
-        if ($preallocated) {
+        if (!is_null($preallocated)) {
             $row['manual'] = $preallocated;
-        } else {
-            $row['manual'] = '';
+            $row['reason'] = $reason;
         }
 
         foreach ($userratings as $choiceid => $userrating) {
