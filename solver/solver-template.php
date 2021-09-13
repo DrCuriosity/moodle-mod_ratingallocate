@@ -58,7 +58,7 @@ class distributor {
     protected $graph;
 
     /**
-     * Compute the 'satisfaction' functions that is to be maximized by adding the 
+     * Compute the 'satisfaction' functions that is to be maximized by adding the
      * ratings users gave to their allocated choices
      * @param array $ratings
      * @param array $distribution
@@ -87,29 +87,110 @@ class distributor {
      */
     public function distribute_users(\ratingallocate $ratingallocate) {
         // Extend PHP time limit
-//        core_php_time_limit::raise();
+        // core_php_time_limit::raise();
 
         // Load data from database
         $choicerecords = $ratingallocate->get_rateable_choices();
         $ratings = $ratingallocate->get_ratings_for_rateable_choices();
 
-        // Randomize the order of the enrties to prevent advantages for early entry
+        // Fetch pre-allocated choices.
+        $preallocations = $ratingallocate->get_manual_preallocations();
+        $preallocuserids = array_unique(array_map(function ($obj) { return $obj->userid; }, $preallocations));
+
+        // Filter any preallocated users out of the rating records.
+        $ratings = $this->filter_by_ids($ratings, 'userid', $preallocuserids);
+
+        // Randomize the order of the entries to prevent advantages for early entry
         shuffle($ratings);
 
-        $usercount = count($ratingallocate->get_raters_in_course());
+        // Count remaining users after pre-allocations.
+        $usercount = count($this->filter_by_ids($ratingallocate->get_raters_in_course(), 'id', $preallocuserids));
+
+        // Adjust maxsize counts down by preallocated choices, remove full choices.
+        $this->adjust_for_preallocations($choicerecords, $preallocations, $ratings);
 
         $distributions = $this->compute_distribution($choicerecords, $ratings, $usercount);
 
         $transaction = $ratingallocate->db->start_delegated_transaction(); // perform all allocation manipulation / inserts in one transaction
 
-        $ratingallocate->clear_all_allocations();
+        // Maintain existing pre-allocations.
+        $ratingallocate->clear_all_allocations(true);
 
         foreach ($distributions as $choiceid => $users) {
             foreach ($users as $userid) {
-                $ratingallocate->add_allocation($choiceid, $userid, $ratingallocate->ratingallocate->id);
+                $ratingallocate->add_allocation($choiceid, $userid);
             }
         }
         $transaction->allow_commit();
+    }
+
+    /**
+     * Adjust maxsize values of each manual pre-allocation's choice.
+     *
+     * Since a maxsize of 0 means no limit, we need to explicitly remove
+     * any choices that get filled up.
+     *
+     * It may be possible to pre-allocate a number of users over the specified
+     * maxsize value. The function assumes this case will have been validated
+     * earlier if that case is a problem.
+     *
+     * Warning: this function alters data in place. Do not commit from the
+     * choice records array once adjustment has occurred, or the original maxsize
+     * values may be lost.
+     *
+     * @param array[\ratingallocate_choice] $choicerecords
+     * @param array $allocations An array of allocation records.
+     * @param array $ratings An array of rating records.
+     */
+    public function adjust_for_preallocations(&$choicerecords, $allocations, &$ratings) {
+        $choiceidstoremove = array();
+
+        foreach ($allocations as $allocid => $allocation) {
+            // Sanity check: only alter on manual pre-allocations.
+            if ($allocation->manual) {
+                $choicerecord = $choicerecords[$allocation->choiceid];
+
+                // Decrement maxsize for this allocation's choice record.
+                if ($choicerecord->maxsize > 1) {
+                    $choicerecord->maxsize--;
+                } else if ($choicerecords[$allocation->choiceid]->maxsize == 1) {
+                    $choicerecord->maxsize--;
+                    // If completely filled, flag the choice for removal.
+                    $choiceidstoremove[] = $allocation->choiceid;
+                }
+            }
+        }
+
+        // Remove any ratings that opt for a removed choice.
+        $ratings = $this->filter_by_ids($ratings, 'choiceid', $choiceidstoremove);
+
+        // Remove all completely full choices.
+        foreach ($choiceidstoremove as $choiceid)
+        {
+            unset($choicerecords[$choiceid]);
+        };
+    }
+
+    /**
+     * Filter an array to remove any items that match a list of target IDs.
+     *
+     * @param array[object] $objects Array of objects with ids
+     * @param string $keyname Key to match against
+     * @param array[string] $ids Array of ids to filter out
+     *
+     * @return array[object] Filtered array of objects with ids.
+     *
+     * Example:
+     *
+     * $filteredrecords = filter_ids($records, 'userid', $ids);
+     *
+     * This will return a list of all records that have a 'userid' value that
+     * is not in the $ids array.
+     */
+    public function filter_by_ids($objects, $keyname, $ids) {
+        return array_filter($objects, function ($obj) use ($keyname, $ids) {
+            return !in_array(get_object_vars($obj)[$keyname], $ids);
+        });
     }
 
     /**
@@ -218,7 +299,7 @@ class distributor {
     }
 
     /**
-     * Augments the flow in the network, i.e. augments the overall 'satisfaction' 
+     * Augments the flow in the network, i.e. augments the overall 'satisfaction'
      * by distributing users to choices
      * Reverses all edges along $path in $graph
      * @param type $path path from t to s
@@ -251,7 +332,7 @@ class distributor {
                 array_splice($this->graph[$from], $foundedgeid, 1);
                 // Add a new edge in the opposite direction whose weight has an opposite sign
                 // array_push($this->graph[$to], new edge($to, $from, -1 * $edge->weight));
-                // according to php doc, this is faster 
+                // according to php doc, this is faster
                 $this->graph[$to][] =  new edge($to, $from, -1 * $edge->weight);
             }
         }

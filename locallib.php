@@ -33,6 +33,7 @@ global $CFG;
 require_once(dirname(__FILE__) . '/lib.php');
 require_once(dirname(__FILE__) . '/form_manual_allocation.php');
 require_once(dirname(__FILE__) . '/form_modify_choice.php');
+require_once(dirname(__FILE__) . '/form_preallocate.php');
 require_once(dirname(__FILE__) . '/renderable.php');
 require_once($CFG->dirroot.'/group/lib.php');
 require_once($CFG->dirroot . '/repository/lib.php');
@@ -85,6 +86,8 @@ define('ACTION_DISABLE_CHOICE', 'disable_choice');
 define('ACTION_DELETE_CHOICE', 'delete_choice');
 define('ACTION_START_DISTRIBUTION', 'start_distribution');
 define('ACTION_MANUAL_ALLOCATION', 'manual_allocation');
+define('ACTION_PREALLOCATE_CHOICE', 'preallocate_choice');
+define('ACTION_PREALLOCATE_REMOVE', 'preallocate_remove');
 define('ACTION_PUBLISH_ALLOCATIONS', 'publish_allocations'); // Make them displayable for the users.
 define('ACTION_SOLVE_LP_SOLVE', 'solve_lp_solve'); // Instead of only generating the mps-file, let it solve.
 define('ACTION_SHOW_RATINGS_AND_ALLOCATION_TABLE', 'show_ratings_and_allocation_table');
@@ -222,7 +225,7 @@ class ratingallocate {
                 raise_memory_limit(MEMORY_EXTRA);
                 core_php_time_limit::raise();
                 // Distribute choices.
-                $timeneeded = $this->distrubute_choices();
+                $timeneeded = $this->distribute_choices();
 
                 // Logging.
                 $event = \mod_ratingallocate\event\distribution_triggered::create_simple(
@@ -379,7 +382,7 @@ class ratingallocate {
 
                 if (!$mform->is_cancelled()) {
                     if ($mform->is_validated()) {
-                        if($data->usegroups) {
+                        if ($data->usegroups) {
                             $this->update_choice_groups($data->choiceid, $data->groupselector);
                         }
 
@@ -542,6 +545,168 @@ class ratingallocate {
         return $output;
     }
 
+    private function process_action_preallocate_choice() {
+        global $USER;
+        $output = '';
+
+        if (has_capability('mod/ratingallocate:modify_choices', $this->context)) {
+            global $OUTPUT;
+            $renderer = $this->get_renderer();
+
+            $choiceid = optional_param('choiceid', 0, PARAM_INT);
+            $choicerecord = false;
+            if ($choiceid) {
+                $choicerecord = $this->db->get_record(this_db\ratingallocate_choices::TABLE, array('id' => $choiceid));
+            }
+
+            if ($choicerecord) {
+                $choice = new ratingallocate_choice($choicerecord);
+                $mform = new preallocate_form(new moodle_url('/mod/ratingallocate/view.php',
+                array('id' => $this->coursemodule->id,
+                    'ratingallocateid' => $this->ratingallocateid,
+                    'action' => ACTION_EDIT_CHOICE)),
+                $this, $choice);
+
+                if ($mform->is_submitted() && $data = $mform->get_submitted_data()) {
+                    if (!$mform->is_cancelled()) {
+                        if ($mform->is_validated()) {
+                            $raters = $this->get_raters_in_course();
+                            $allpreallocations = $this->get_manual_preallocations();
+                            $preallocateduserids = $this->get_preallocated_userids($allpreallocations);
+                            $newrecords = array();
+                            $updaterecords = array();
+                            foreach ($data->userselector as $userid) {
+                                // Only process valid raters.
+                                if (array_key_exists($userid, $raters)) {
+                                    $record = array(
+                                        this_db\ratingallocate_allocations::USERID => $userid,
+                                        this_db\ratingallocate_allocations::RATINGALLOCATEID => $data->ratingallocateid,
+                                        this_db\ratingallocate_allocations::CHOICEID => $data->choiceid,
+                                        this_db\ratingallocate_allocations::MANUAL => 1,
+                                        this_db\ratingallocate_allocations::REASON => $data->reason,
+                                        this_db\ratingallocate_allocations::ALLOCATORID => $USER->id,
+                                    );
+
+                                    // Update existing raters from previous choices, add new ones.
+                                    if (in_array($userid, $preallocateduserids)) {
+                                        $updaterecords[$userid] = $record;
+                                    } else {
+                                        $newrecords[] = $record;
+                                    }
+                                } else {
+                                    redirect(new moodle_url('/mod/ratingallocate/view.php', array(
+                                            'id' => $this->coursemodule->id,
+                                            'action' => ACTION_PREALLOCATE_CHOICE,
+                                            'choiceid' => $choiceid,
+                                        )),
+                                        get_string('preallocate_add_notification_invaliduser', 'mod_ratingallocate', $userid),
+                                        null,
+                                        \core\output\notification::NOTIFY_ERROR);
+                                }
+                            }
+                            if($newrecords) {
+                                $this->db->insert_records(this_db\ratingallocate_allocations::TABLE, $newrecords);
+                            }
+                            if($updaterecords) {
+                                foreach($updaterecords as $update) {
+                                    $target = array_search($update[this_db\ratingallocate_allocations::USERID], array_column(
+                                        $allpreallocations,
+                                        this_db\ratingallocate_allocations::USERID,
+                                        this_db\ratingallocate_allocations::ID)
+                                    );
+
+                                    $update[this_db\ratingallocate_allocations::ID] = $allpreallocations[$target]->{this_db\ratingallocate_allocations::ID};
+                                    $this->db->update_record(this_db\ratingallocate_allocations::TABLE, $update);
+                                }
+                            }
+
+                            redirect(new moodle_url('/mod/ratingallocate/view.php', array(
+                                    'id' => $this->coursemodule->id,
+                                    'action' => ACTION_PREALLOCATE_CHOICE,
+                                    'choiceid' => $choiceid,
+                                )),
+                                get_string('preallocate_add_notification', 'mod_ratingallocate', count($newrecords) + count($updaterecords)),
+                                null,
+                                \core\output\notification::NOTIFY_SUCCESS);
+
+                        } else {
+                            // Present with validation errors.
+                            $output .= $OUTPUT->heading(
+                                get_string('preallocate_users_for_choice', 'mod_ratingallocate', $choice->title), 2);
+                            $output .= $mform->to_html();
+                            return $output;
+                        }
+                    }
+                    // If form was submitted using save or cancel, redirect to the choices table.
+                    redirect(new moodle_url('/mod/ratingallocate/view.php',
+                        array('id' => $this->coursemodule->id, 'action' => ACTION_SHOW_CHOICES)));
+                } else {
+                    // Output only preallocations for this particular choice.
+                    $choicepreallocations = $this->get_manual_preallocations($choiceid);
+                    $output .= $OUTPUT->heading(
+                        get_string('preallocate_users_for_choice', 'mod_ratingallocate', $choice->title), 2);
+                    $output .= $mform->to_html();
+                    $output .= $renderer->ratingallocate_preallocations_table($this, $choice, $choicepreallocations);
+                }
+
+            } else {
+                redirect(new moodle_url('/mod/ratingallocate/view.php',
+                array('id' => $this->coursemodule->id, 'action' => ACTION_SHOW_CHOICES)));
+            }
+
+        }
+
+        return $output;
+    }
+
+    private function process_action_preallocate_remove() {
+        $output = '';
+
+        if (has_capability('mod/ratingallocate:modify_choices', $this->context)) {
+            $choiceid = optional_param('choiceid', 0, PARAM_INT);
+            $allocationid = optional_param('allocation', 0, PARAM_INT);
+
+            // Defaults until changed.
+            $notification = get_string('preallocate_removed_notification_missing', 'mod_ratingallocate');
+            $status = \core\output\notification::NOTIFY_ERROR;
+
+            if ($choiceid && $allocationid) {
+                $choicerecord = $this->db->get_record(this_db\ratingallocate_choices::TABLE, array('id' => $choiceid));
+                $choice = new ratingallocate_choice($choicerecord);
+
+                // Choice ID is not strictly needed here, but included for data validation.
+                $allocation = $this->db->get_record(this_db\ratingallocate_allocations::TABLE,
+                    array('id' => $allocationid, 'choiceid' => $choiceid));
+                if ($allocation) {
+                    if ($allocation->manual) {
+                        $this->db->delete_records(this_db\ratingallocate_allocations::TABLE,
+                            array('id' => $allocationid, 'choiceid' => $choiceid));
+
+                        $foruser = core_user::get_user($allocation->userid);
+                        $notification = get_string('preallocate_removed_notification', 'mod_ratingallocate', array(
+                            'user' => fullname($foruser),
+                            'choice' => $choice->title,
+
+                        ));
+                        $status = \core\output\notification::NOTIFY_SUCCESS;
+                    } else {
+                        $notification = get_string('preallocate_removed_notification_nonmanual', 'mod_ratingallocate');
+                    }
+                }
+
+                redirect(new moodle_url('/mod/ratingallocate/view.php',
+                    array('id' => $this->coursemodule->id, 'action' => ACTION_PREALLOCATE_CHOICE, 'choiceid' => $choiceid)),
+                    $notification,
+                    null,
+                    $status);
+            }
+            redirect(new moodle_url('/mod/ratingallocate/view.php',
+                array('id' => $this->coursemodule->id, 'action' => ACTION_SHOW_CHOICES)));
+        }
+
+        return $output;
+    }
+
     private function process_action_show_ratings_and_alloc_table() {
         $output = '';
         // Print ratings table.
@@ -635,13 +800,31 @@ class ratingallocate {
     }
 
     private function process_default() {
-        global $OUTPUT;
+        global $OUTPUT, $USER;
         $output = '';
         /* @var mod_ratingallocate_renderer */
         $renderer = $this->get_renderer();
         $status = $this->get_status();
         if (has_capability('mod/ratingallocate:give_rating', $this->context, null, false)) {
-            if ($status === self::DISTRIBUTION_STATUS_RATING_IN_PROGRESS) {
+            // Check for preallocated choice before presenting rating options.
+            $preallocation = $this->db->get_record(this_db\ratingallocate_allocations::TABLE, array(
+                this_db\ratingallocate_allocations::RATINGALLOCATEID => $this->ratingallocateid,
+                this_db\ratingallocate_allocations::MANUAL => 1,
+                this_db\ratingallocate_allocations::USERID => $USER->id,
+            ));
+            if ($preallocation) {
+                $choice = $this->db->get_record(this_db\ratingallocate_choices::TABLE, array(
+                    this_db\ratingallocate_choices::ID => $preallocation->choiceid,
+                ));
+
+                $allocator = core_user::get_user($preallocation->allocatorid);
+
+                $output .= get_string('preallocated_to_choice', 'mod_ratingallocate', array(
+                    'choice' => $choice->title,
+                    'allocator' => fullname($allocator),
+                ));
+
+            } else if ($status === self::DISTRIBUTION_STATUS_RATING_IN_PROGRESS) {
                 if ($this->is_setup_ok()) {
                     $output .= $OUTPUT->single_button(new moodle_url('/mod/ratingallocate/view.php',
                     array('id' => $this->coursemodule->id,
@@ -747,6 +930,15 @@ class ratingallocate {
                 $output .= $this->process_action_manual_allocation();
                 break;
 
+            case ACTION_PREALLOCATE_CHOICE:
+                $output .= $this->process_action_preallocate_choice();
+                $this->showinfo = false;
+                break;
+
+            case ACTION_PREALLOCATE_REMOVE:
+                $this->process_action_preallocate_remove();
+                return "";
+
             case ACTION_SHOW_RATINGS_AND_ALLOCATION_TABLE:
                 $output .= $this->process_action_show_ratings_and_alloc_table();
                 $this->showinfo = false;
@@ -786,6 +978,9 @@ class ratingallocate {
             $choicestatus->own_choices = $this->get_rating_data_for_user($USER->id);
             // Filter choices to display by groups, where 'usegroups' is true.
             $choicestatus->own_choices = $this->filter_choices_by_groups($choicestatus->own_choices, $USER->id);
+            // Filter choices that are already full due to preallocations.
+            $choicestatus->own_choices = $this->filter_choices_by_full_preallocations($choicestatus->own_choices);
+
             $choicestatus->allocations = $this->get_allocations_for_user($USER->id);
             $choicestatus->strategy = $this->get_strategy_class();
             $choicestatus->show_distribution_info = has_capability('mod/ratingallocate:start_distribution', $this->context);
@@ -845,7 +1040,7 @@ class ratingallocate {
      * distribution of choices for each user
      * take care about max_execution_time and memory_limit
      */
-    public function distrubute_choices() {
+    public function distribute_choices() {
         require_capability('mod/ratingallocate:start_distribution', $this->context);
 
         // Set algorithm status to running.
@@ -1052,10 +1247,60 @@ class ratingallocate {
     }
 
     /**
-     * Removes all allocations for choices in $ratingallocateid
+     * Return all manual pre-allocations for the activity.
+     *
+     * @param int $choiceid (optional) ID of choice record to filter by.
+     *
+     * @return array of manual allocation records.
      */
-    public function clear_all_allocations() {
-        $this->db->delete_records('ratingallocate_allocations', array('ratingallocateid' => intval($this->ratingallocateid)));
+    public function get_manual_preallocations($choiceid=null) {
+        $fields = array(
+            'ratingallocateid' => intval($this->ratingallocateid),
+            'manual' => 1
+        );
+
+        if($choiceid) {
+            $fields['choiceid'] = $choiceid;
+        }
+
+        $records = $this->db->get_records('ratingallocate_allocations', $fields);
+        return $records;
+    }
+
+    /**
+     * Return IDs of users with manual pre-allocations in this activity.
+     *
+     * @param array $allocations Allocation records, if they have already been fetched.
+     *
+     * @return array of user IDs.
+     */
+    public function get_preallocated_userids($allocations = null) {
+        if(empty($allocations)) {
+            $allocations = $this->get_manual_preallocations();
+        }
+
+        $userids = array();
+        foreach ($allocations as $alloc) {
+            $userids[] = $alloc->userid;
+        }
+
+        return $userids;
+    }
+
+    /**
+     * Removes all allocations for choices in $ratingallocateid
+     *
+     * @param boolean $keepmanuals Keep manual pre-allocations in place.
+     *
+     */
+    public function clear_all_allocations($keepmanuals=false) {
+        $conditions = array(
+            'ratingallocateid' => intval($this->ratingallocateid)
+        );
+        if ($keepmanuals) {
+            $conditions['manual'] = 0;
+        }
+        $this->db->delete_records('ratingallocate_allocations', $conditions);
     }
 
     /**
@@ -1318,6 +1563,45 @@ class ratingallocate {
     }
 
     /**
+     * Fetches a count of preallocated users for all choice IDs in rating.
+     */
+    public function get_preallocation_counts() {
+        $sql = 'SELECT choiceid, COUNT(userid)
+            FROM {ratingallocate_allocations}
+            WHERE ratingallocateid=:ratingallocateid
+            AND manual=1
+            GROUP BY choiceid';
+
+        $countrecords = $this->db->get_records_sql($sql, array(
+            'ratingallocateid' => $this->ratingallocateid
+        ));
+        $counts = array();
+        foreach($countrecords as $record) {
+            $counts[$record->choiceid] = $record->count;
+        }
+        return $counts;
+    }
+
+    /**
+     * Filters an array of choices, removing any with full preallocations.
+     *
+     * @param array $choices An array of objects, keyed by ID.
+     * @return array A filtered array of choices, keyed by ID.
+     */
+    public function filter_choices_by_full_preallocations($choices) {
+        $filteredchoices = array();
+        $preallocationcounts = $this->get_preallocation_counts();
+
+        foreach ($choices as $choiceid => $choice) {
+            if (empty($preallocationcounts[$choiceid]) || $preallocationcounts[$choiceid] < $choice->maxsize) {
+                $filteredchoices[$choiceid] = $choice;
+            }
+        }
+
+        return $filteredchoices;
+    }
+
+    /**
      * Returns all choices in the instance with $ratingallocateid
      */
     public function get_choices() {
@@ -1445,15 +1729,21 @@ class ratingallocate {
      * add an allocation between choiceid and userid
      * @param int $choiceid
      * @param int $userid
+     * @param boolean $manual Is it a manual pre-allocation?
+     * @param string $reason Reason(s) for pre-allocation.
+     * @param int $allocatorid User responsible for pre-allocation.
      * @return boolean
      */
-    public function add_allocation($choiceid, $userid) {
-        $this->db->insert_record_raw('ratingallocate_allocations', array(
+    public function add_allocation($choiceid, $userid, $manual=false, $reason=null, $allocatorid=null) {
+        $result = $this->db->insert_record('ratingallocate_allocations', array(
             'choiceid' => $choiceid,
             'userid' => $userid,
-            'ratingallocateid' => $this->ratingallocateid
+            'ratingallocateid' => $this->ratingallocateid,
+            'manual' => (int) $manual,
+            'reason' => $reason,
+            'allocatorid' => $allocatorid,
         ));
-        return true;
+        return $result;
     }
 
     /**

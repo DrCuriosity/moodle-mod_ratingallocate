@@ -16,18 +16,23 @@
 
 
 /**
- * Defines the version of ratingallocate
+ * Dialogue external functions
  *
  * @package    mod_ratingallocate
- * @copyright 2014 T Reischmann, C Usener
- * @copyright based on code by M Schulze copyright (C) 2014 M Schulze
+ * @copyright  2021 Catalyst IT
+ * @author     David Thompson <davidthompson@catalyst.net.nz>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
-$plugin->version   = 2021082600;        // The current module version (Date: YYYYMMDDXX)
-$plugin->requires  = 2017111300;        // Requires this Moodle version
-$plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = 'v3.10-r1';
-$plugin->component = 'mod_ratingallocate';  // To check on upgrade, that module sits in correct place
+$functions = [
+    'mod_ratingallocate_search_users' => [
+        'classname' => 'mod_ratingallocate\external\search_users',
+        'classpath' => '',
+        'methodname' => 'execute',
+        'description' => 'Search rating allocation participants for a choice, excluding preallocations',
+        'ajax' => true,
+        'type' => 'read',
+        'capabilities' => 'moodle/course:viewparticipants',
+        'services' => array(MOODLE_OFFICIAL_MOBILE_SERVICE),
+    ],
+];

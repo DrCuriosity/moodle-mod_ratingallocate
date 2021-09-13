@@ -72,6 +72,7 @@ $string['no_choice_to_rate'] = 'There are no choices to rate!';
 $string['too_few_choices_to_rate'] = 'There are too few choices to rate! Students have to rank at least {$a} choices!';
 $string['at_least_one_rateable_choices_needed'] = 'You need at least one rateable choice.';
 $string['no_rating_possible'] = 'Currently, there is no rating possible!';
+$string['preallocated_to_choice'] = 'You have been pre-allocated to "{$a->choice}" by {$a->allocator}. No other ratings will be used.';
 // </editor-fold>
 // <editor-fold defaultstate="collapsed" desc="Administrator View">
 $string['allocation_manual_explain_only_raters'] = 'Select a choice to be assigned to a user.
@@ -190,7 +191,31 @@ $string['modify_choices_group_desc_published'] = 'The allocations have been publ
 $string['err_positivnumber'] = 'You must supply a positive number here.';
 $string['saveandnext'] = 'Save and add next';
 $string['choice_added_notification'] = 'Choice saved.';
+$string['preallocate_users'] = 'Preallocate users';
 
+// </editor-fold>
+
+// <editor-fold defaultstate="collapsed" desc="Form to preallocate users to choices (administrator)">
+$string['preallocate_users_for_choice'] = 'Preallocate users for {$a}';
+$string['preallocate_selectusers'] = 'Select users to allocate';
+$string['preallocate_maxsize'] = 'A maximum of {$a} users should be allocated to this choice.';
+$string['preallocate_reason'] = 'Reasons';
+$string['preallocate_reasonexplanation'] = 'Reasons will be applied to all selected users above.';
+$string['preallocate_table'] = 'Preallocated users';
+$string['preallocate_table_noneyet'] = 'No users preallocated to this choice yet.';
+$string['preallocate_header_user_name'] = 'Name';
+$string['preallocate_header_user_idnumber'] = 'ID Number';
+$string['preallocate_header_user_email'] = 'Email address';
+$string['preallocate_header_reason'] = 'Allocation Reasons';
+$string['preallocate_header_allocator'] = 'Allocator';
+$string['preallocate_header_action'] = 'Action';
+$string['preallocate_add_notification_invaliduser'] = 'Could not add preallocate for user id:{$a}. User is not a valid rater for this activity.';
+$string['preallocate_add_notification'] = 'Preallocation(s) added or updated: {$a}';
+$string['preallocate_removeallocation'] = 'Remove Allocation';
+$string['preallocate_removeconfirm'] = 'Do you really want to remove preallocation for "{$a}"?';
+$string['preallocate_removed_notification'] = 'Preallocation for user "{$a->user}" removed from choice "{$a->choice}".';
+$string['preallocate_removed_notification_missing'] = 'The preallocation requested for removal could not be found.';
+$string['preallocate_removed_notification_nonmanual'] = 'The allocation requested for removal is not a manual preallocation.';
 // </editor-fold>
 
 // <editor-fold defaultstate="collapsed" desc="Form to edit the instance(administrator)">

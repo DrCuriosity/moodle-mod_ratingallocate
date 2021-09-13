@@ -104,6 +104,8 @@ class mod_ratingallocate_view_form extends \ratingallocate_strategyform {
         $ratingdata = $this->ratingallocate->get_rating_data_for_user($USER->id);
         // Filter choices to display by groups, where 'usegroups' is true.
         $ratingdata = $this->ratingallocate->filter_choices_by_groups($ratingdata, $USER->id);
+        // Filter choices that are already full due to preallocations.
+        $ratingdata = $this->ratingallocate->filter_choices_by_full_preallocations($ratingdata);
 
         $choicecounter = $this->get_strategysetting(strategy::COUNTOPTIONS);
         $choices = array();

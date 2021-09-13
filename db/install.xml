@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="mod/ratingallocate/db" VERSION="20210629" COMMENT="XMLDB file for Moodle mod/ratingallocate"
+<XMLDB PATH="mod/ratingallocate/db" VERSION="20210727" COMMENT="XMLDB file for Moodle mod/ratingallocate"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
@@ -64,11 +64,15 @@
         <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
         <FIELD NAME="ratingallocateid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="instance of the ratingallocate problem"/>
         <FIELD NAME="choiceid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="manual" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Is this a manual pre-allocation? (1 = Yes, 0 = No)"/>
+        <FIELD NAME="reason" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Reason(s) were given for manual allocation (line break separated)"/>
+        <FIELD NAME="allocatorid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="If manual, user responsible for allocation"/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
         <KEY NAME="ratingallocateid" TYPE="foreign" FIELDS="ratingallocateid" REFTABLE="ratingallocate" REFFIELDS="id"/>
         <KEY NAME="choiceid" TYPE="foreign" FIELDS="choiceid" REFTABLE="ratingallocate_choices" REFFIELDS="id"/>
+        <KEY NAME="allocatorid" TYPE="foreign" FIELDS="allocatorid" REFTABLE="user" REFFIELDS="id"/>
       </KEYS>
     </TABLE>
     <TABLE NAME="ratingallocate_group_choices" COMMENT="Group restrictions on individual choice items in a rating allocation activity. When 'usegroups' in {ratingallocate_choices} is true, choices will only be shown to groups specified by entries in this table.">
