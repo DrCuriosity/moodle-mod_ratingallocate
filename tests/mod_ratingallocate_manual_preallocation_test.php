@@ -105,7 +105,7 @@ class mod_ratingallocate_manual_preallocation_testcase extends advanced_testcase
     }
 
 
-    protected function setUp() {
+    protected function setUp(): void {
         parent::setUp();
 
         $generator = $this->getDataGenerator();
